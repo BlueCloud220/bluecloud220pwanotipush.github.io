@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="es" class="light dark">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Inicio - PushWave</title>
+
+    <meta name="viewport" content="width=device-width" />
+    <meta name="theme-color" content="#0386fa" />
+    <link rel="icon" sizes="32x32" href="favicon.ico" />
+    <link rel="manifest" href="site.webmanifest" />
+    <script src="ungap/custom-elements.js"></script>
+
+    <script type="module" src="js/configura.js"></script>
+    <link rel="stylesheet" href="css/estilos.css" />
+    <link rel="stylesheet" href="css/transicion_pestanas.css" />
+
+    <script type="module" src="lib/js/submitForm.js"></script>
+    <script type="module" src="lib/js/muestraError.js"></script>
+
+    <style>
+      button {
+        width: 200px;
+      }
+
+      /* Centrar los botones dentro del contenedor */
+      menu {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 1rem; /* Espaciado entre los botones */
+        list-style: none;
+        padding: 0;
+        margin: 0;
+      }
+
+    </style>
+  </head>
+
+  <body onload="preparaVista()">
+    <md-top-app-bar adicional="tab" style="text-align: center">
+      <h1>Inicio - PushWave</h1>
+    </md-top-app-bar>
+
+    <nav-tab-fixed id="tab"></nav-tab-fixed>
+
+    <main>
+      <form
+        onsubmit="submitForm('srv/notifica.php', event)
+        .then(respuesta => muestraObjeto(document, respuesta.body))
+        .catch(muestraError)"
+      >
+        <p>
+          <label class="md-filled-text-field">
+            <input name="mensaje" autofocus placeholder="Nombre*" />
+            <span>Mensaje *</span>
+            <small>Obligatorio</small>
+          </label>
+        </p>
+
+        <menu
+          style="display: flex; list-style: none; flex-wrap: wrap; gap: 0.5rem"
+        >
+          <li>
+            <button
+              class="md-outline-button"
+              id="btnSuscribe"
+              type="button"
+              hidden
+              onclick="suscribe()"
+            >
+              Suscríbete
+            </button>
+          </li>
+          <li>
+            <button
+              class="md-outline-button"
+              id="btnCancela"
+              type="button"
+              hidden
+              onclick="cancela()"
+            >
+              Cancela suscripción
+            </button>
+          </li>
+          <li>
+            <button
+              class="md-filled-button"
+              id="btnNotifica"
+              type="submit"
+              hidden
+            >
+              Notifica
+            </button>
+          </li>
+          <li style="display: none">
+            <a href="srv/genera-llaves.php" target="_blank">Genera llaves</a>
+          </li>
+        </menu>
+
+        <p>
+          <span style="font-weight: bold">Estado:</span>
+          <output id="outEstado">
+            <progress max="100">Cargando&hellip;</progress>
+          </output>
+        </p>
+
+        <fieldset
+          style="
+            max-width: 95%;
+            max-height: 300px;
+            overflow-y: auto;
+            padding: 10px;
+            width: 100%;
+            box-sizing: border-box;
+            margin: 0 auto;
+            display: block;
+          "
+        >
+          <legend style="font-weight: bold">
+            Reporte de envío a endpoints:
+          </legend>
+          <dl
+            id="reporte"
+            style="
+              max-width: 100%;
+              word-break: break-all;
+              overflow-wrap: anywhere;
+            "
+          ></dl>
+        </fieldset>
+      </form>
+    </main>
+
+    <nav-drw></nav-drw>
+
+    <script type="module">
+      import { exportaAHtml } from "./lib/js/exportaAHtml.js";
+      import { activaNotificacionesPush } from "./lib/js/activaNotificacionesPush.js";
+      import { getSuscripcionPush } from "./lib/js/getSuscripcionPush.js";
+      import { suscribeAPush } from "./lib/js/suscribeAPush.js";
+      import { cancelaSuscripcionPush } from "./lib/js/cancelaSuscripcionPush.js";
+      import { enviaJson } from "./lib/js/enviaJson.js";
+      import { muestraError } from "./lib/js/muestraError.js";
+      import { muestraObjeto } from "./lib/js/muestraObjeto.js";
+      import { urlBase64ToUint8Array } from "./lib/js/urlBase64ToUint8Array.js";
+      import { calculaDtoParaSuscripcion } from "./lib/js/calculaDtoParaSuscripcion.js";
+
+      const applicationServerKey = urlBase64ToUint8Array(
+        "BBvrWghrlEvYhq6ztbCurCZcY-9jZzCdINXJ9qi2dEJetj-9B5tIeAGZHarRb5ynUYo6SRg3S-MfAoUXbI6x4SI"
+      );
+      /** @enum {string} */
+      const Estado = {
+        CALCULANDO: "Calculando…",
+        SUSCRITO: "Suscrito",
+        DESUSCRITO: "Sin suscripción",
+        INCOMPATIBLE: "Incompatible",
+      };
+
+      async function preparaVista() {
+        try {
+          await activaNotificacionesPush("sw.js");
+          const suscripcion = await getSuscripcionPush();
+          if (suscripcion === null) {
+            muestraEstado(Estado.DESUSCRITO);
+          } else {
+            // Modifica la suscripción en el servidor,
+            const dto = calculaDtoParaSuscripcion(suscripcion);
+            await enviaJson("srv/suscripcion-modifica.php", dto);
+            muestraEstado(Estado.SUSCRITO);
+          }
+        } catch (error) {
+          muestraEstado(Estado.INCOMPATIBLE);
+          muestraError(error);
+        }
+      }
+      exportaAHtml(preparaVista);
+
+      async function suscribe() {
+        try {
+          muestraEstado(Estado.CALCULANDO);
+          const suscripcion = await suscribeAPush(applicationServerKey);
+          // Agrega la suscripción al servidor,
+          const dto = calculaDtoParaSuscripcion(suscripcion);
+          await enviaJson("srv/suscripcion-modifica.php", dto);
+          muestraEstado(Estado.SUSCRITO);
+        } catch (error) {
+          muestraError(error);
+        }
+      }
+      exportaAHtml(suscribe);
+
+      async function cancela() {
+        try {
+          muestraEstado(Estado.CALCULANDO);
+          const suscripcion = await cancelaSuscripcionPush();
+          if (suscripcion !== null) {
+            // Elimina la suscripción en el servidor,
+            const dto = calculaDtoParaSuscripcion(suscripcion);
+            await enviaJson("srv/suscripcion-elimina.php", dto);
+            muestraEstado(Estado.DESUSCRITO);
+          }
+        } catch (error) {
+          muestraError(error);
+        }
+      }
+      exportaAHtml(cancela);
+
+      /** @param {Estado} estado */
+      function muestraEstado(estado) {
+        outEstado.value = estado;
+        if (estado === Estado.INCOMPATIBLE || estado === Estado.CALCULANDO) {
+          btnSuscribe.hidden = true;
+          btnCancela.hidden = true;
+          btnNotifica.hidden = true;
+        } else if (estado === Estado.SUSCRITO) {
+          btnSuscribe.hidden = true;
+          btnCancela.hidden = false;
+          btnNotifica.hidden = false;
+        } else if (estado === Estado.DESUSCRITO) {
+          btnSuscribe.hidden = false;
+          btnCancela.hidden = true;
+          btnNotifica.hidden = true;
+        }
+      }
+    </script>
+  </body>
+</html>
