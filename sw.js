@@ -15,7 +15,7 @@
  * conoce como número menor y se cambia cuando se realizan
  * modificaciones menores.
  */
-const VERSION = "5.00";
+const VERSION = "6.01";
 
 /**
  * Nombre de la carpeta de caché.
@@ -62,7 +62,6 @@ const ARCHIVOS = [
   "img/screenshot_horizontal.png",
   "img/screenshot_horizontal_2.png",
   "img/screenshot_horizontal_3.png",
-  "img/screenshot_horizontal_4.png",
   "img/screenshot_vertical.png",
   "img/screenshot_vertical_2.png",
   "img/screenshot_vertical_3.png",
@@ -121,8 +120,6 @@ const ARCHIVOS = [
   "material-tokens/css/shape.css",
   "material-tokens/css/state.css",
   "material-tokens/css/typography.css",
-  "material-tokens/css/theme/dark.css",
-  "material-tokens/css/theme/light.css",
   "ungap/custom-elements.js",
   "vendor/brick/math/CHANGELOG.md",
   "vendor/brick/math/composer.json",
@@ -227,28 +224,17 @@ if (self instanceof ServiceWorkerGlobalScope) {
 // Función para llenar el caché con los archivos definidos.
 async function llenaElCache() {
   console.log("Intentando cargar caché:", CACHE);
-  try {
-    // Borra caché anterior
-    const keys = await caches.keys();
-    for (const key of keys) {
-      await caches.delete(key);
-    }
-
-    // Abre caché nuevo
-    const cache = await caches.open(CACHE);
-
-    // Prueba agregar archivos individualmente para identificar el problema
-    for (const file of ARCHIVOS) {
-      try {
-        await cache.add(file);
-      } catch (err) {}
-    }
-
-    console.log("Cache cargado:", CACHE);
-    console.log("Versión:", VERSION);
-  } catch (error) {
-    console.error("Error llenando el caché:", error);
+  // Borra todos los cachés.
+  const keys = await caches.keys();
+  for (const key of keys) {
+    await caches.delete(key);
   }
+  // Abre el caché de este service worker.
+  const cache = await caches.open(CACHE);
+  // Carga el listado de ARCHIVOS.
+  await cache.addAll(ARCHIVOS);
+  console.log("Cache cargado:", CACHE);
+  console.log("Versión:", VERSION);
 }
 
 /** @param {FetchEvent} evt */
